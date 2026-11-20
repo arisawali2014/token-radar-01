@@ -105,6 +105,11 @@ button { cursor: pointer; }
 }
 .field input { min-width: 280px; }
 .field input::placeholder { color: var(--faint); }
+.check {
+  display: flex; align-items: center; gap: var(--s2); min-height: 38px;
+  color: var(--muted); font-size: 13px; cursor: pointer;
+}
+.check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
 .tabs {
   display: flex; gap: var(--s1); padding: 3px;
   border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--surface);

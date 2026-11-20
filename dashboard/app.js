@@ -2,15 +2,19 @@
 // main.ts) and renders the ranked board, a filterable table, a per-protocol detail
 // drawer with the model's own inputs and the protocol's farm plan, and the live-token
 // protocols set aside. No network: every byte it shows is already in data.js.
-// State is mirrored in the URL hash (#q= #category= #chain= #tab= #p=) so a board,
-// a filtered view and a detail view are each one link.
+//
+// The shell (header, lede, stats, controls, model panel, footer) is built once;
+// only the table region re-renders when the user types, sorts or filters, so the
+// search box never loses focus mid-word. State is mirrored in the URL hash
+// (#q= #category= #chain= #watch= #tab= #p=) so a board, a filtered view and a
+// detail view are each one link.
 (function () {
   'use strict';
 
   var DATA = window.RADAR;
   if (!DATA) return;
   var app = document.getElementById('board');
-  var state = { q: '', category: 'all', chain: 'all', tab: 'pre-token', sort: 'implied', dir: -1, selected: null };
+  var state = { q: '', category: 'all', chain: 'all', watch: false, tab: 'pre-token', sort: 'implied', dir: -1, selected: null };
 
   var usd0 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
@@ -73,14 +77,21 @@
     if (params.get('q')) state.q = params.get('q');
     if (params.get('category')) state.category = params.get('category');
     if (params.get('chain')) state.chain = params.get('chain');
+    if (params.get('watch') === '1') state.watch = true;
     if (params.get('tab')) state.tab = params.get('tab') === 'live' ? 'live' : 'pre-token';
-    if (params.get('p')) state.selected = params.get('p');
+    // A #p= slug that names no row is stale (a board that changed under the
+    // link): drop it here so the hash never claims a detail view that cannot open.
+    if (params.get('p')) {
+      var known = DATA.rows.some(function (r) { return r.slug === params.get('p'); });
+      if (known) state.selected = params.get('p');
+    }
   }
   function writeHash() {
     var params = new URLSearchParams();
     if (state.q) params.set('q', state.q);
     if (state.category !== 'all') params.set('category', state.category);
     if (state.chain !== 'all') params.set('chain', state.chain);
+    if (state.watch) params.set('watch', '1');
     if (state.tab !== 'pre-token') params.set('tab', state.tab);
     if (state.selected) params.set('p', state.selected);
     var next = params.toString();
@@ -91,6 +102,7 @@
   function filteredRows() {
     var q = state.q.trim().toLowerCase();
     return DATA.rows.filter(function (r) {
+      if (state.watch && !r.watchlist) return false;
       if (state.category !== 'all' && (r.category || 'Other') !== state.category) return false;
       if (state.chain !== 'all' && !(r.chains || []).includes(state.chain)) return false;
       if (!q) return true;
@@ -143,35 +155,68 @@
     );
   }
 
+  // The count line, the table slot and the model panel are the only pieces that
+  // change after the shell is built; the controls keep their own elements and
+  // listeners. syncControls() pushes state back into those elements, so a
+  // "clear filters" click does not leave stale text in the search box.
+  var countEl = null;
+  var tableSlot = null;
+  var modelSlot = null;
+  var searchInput = null;
+  var catSelect = null;
+  var chainSelect = null;
+  var watchBox = null;
+  var preBtn = null;
+  var liveBtn = null;
+
+  function syncControls() {
+    if (searchInput) searchInput.value = state.q;
+    if (catSelect) catSelect.value = state.category;
+    if (chainSelect) chainSelect.value = state.chain;
+    if (watchBox) watchBox.checked = state.watch;
+    if (preBtn) preBtn.setAttribute('aria-pressed', state.tab === 'pre-token' ? 'true' : 'false');
+    if (liveBtn) liveBtn.setAttribute('aria-pressed', state.tab === 'live' ? 'true' : 'false');
+  }
+
   function controls() {
     var categories = Array.from(new Set(DATA.rows.map(function (r) { return r.category || 'Other'; }))).sort();
     var chains = Array.from(new Set(DATA.rows.reduce(function (acc, r) { return acc.concat(r.chains || []); }, []))).sort();
     var search = el('input', { type: 'search', id: 'q', placeholder: 'Search name, category or chain', value: state.q, 'aria-label': 'Search the board' });
-    search.addEventListener('input', function () { state.q = search.value; writeHash(); render(); });
+    searchInput = search;
+    search.addEventListener('input', function () { state.q = search.value; writeHash(); renderTable(); });
     var cat = el('select', { id: 'category', 'aria-label': 'Filter by category' },
       el('option', { value: 'all', text: 'All categories' }),
       categories.map(function (c) { return el('option', { value: c, text: c, selected: c === state.category ? 'selected' : null }); })
     );
-    cat.addEventListener('change', function () { state.category = cat.value; writeHash(); render(); });
+    catSelect = cat;
+    cat.addEventListener('change', function () { state.category = cat.value; writeHash(); renderTable(); });
     var chain = el('select', { id: 'chain', 'aria-label': 'Filter by chain' },
       el('option', { value: 'all', text: 'All chains' }),
       chains.map(function (c) { return el('option', { value: c, text: c, selected: c === state.chain ? 'selected' : null }); })
     );
-    chain.addEventListener('change', function () { state.chain = chain.value; writeHash(); render(); });
-    var pre = el('button', { type: 'button', 'aria-pressed': state.tab === 'pre-token' ? 'true' : 'false', text: 'Pre-token', onclick: function () { state.tab = 'pre-token'; writeHash(); render(); } });
-    var live = el('button', { type: 'button', 'aria-pressed': state.tab === 'live' ? 'true' : 'false', text: 'Live token', onclick: function () { state.tab = 'live'; writeHash(); render(); } });
+    chainSelect = chain;
+    chain.addEventListener('change', function () { state.chain = chain.value; writeHash(); renderTable(); });
+    var watchBoxEl = el('input', { type: 'checkbox', id: 'watch', checked: state.watch ? 'checked' : null, 'aria-label': 'Watchlist only' });
+    watchBox = watchBoxEl;
+    watchBoxEl.addEventListener('change', function () { state.watch = watchBoxEl.checked; writeHash(); renderTable(); });
+    var pre = el('button', { type: 'button', 'aria-pressed': state.tab === 'pre-token' ? 'true' : 'false', text: 'Pre-token', onclick: function () { state.tab = 'pre-token'; writeHash(); syncControls(); renderTable(); } });
+    var live = el('button', { type: 'button', 'aria-pressed': state.tab === 'live' ? 'true' : 'false', text: 'Live token', onclick: function () { state.tab = 'live'; writeHash(); syncControls(); renderTable(); } });
+    preBtn = pre;
+    liveBtn = live;
+    countEl = el('span', { class: 'count' });
     return el('div', { class: 'controls' },
       el('div', { class: 'field' }, el('label', { for: 'q', text: 'Search' }), search),
       el('div', { class: 'field' }, el('label', { for: 'category', text: 'Category' }), cat),
       el('div', { class: 'field' }, el('label', { for: 'chain', text: 'Chain' }), chain),
+      el('label', { class: 'check', for: 'watch' }, watchBoxEl, 'Watchlist only'),
       el('div', { class: 'field' }, el('span', { text: 'Token status' }), el('div', { class: 'tabs' }, pre, live)),
-      el('span', { class: 'count', text: state.tab === 'pre-token' ? filteredRows().length + ' of ' + DATA.board_size + ' rows shown' : DATA.live.length + ' live-token protocols' })
+      countEl
     );
   }
 
   function sortHeader(key, label) {
     return el('th', { scope: 'col' },
-      el('button', { type: 'button', onclick: function () { if (state.sort === key) state.dir = -state.dir; else { state.sort = key; state.dir = -1; } render(); } },
+      el('button', { type: 'button', onclick: function () { if (state.sort === key) state.dir = -state.dir; else { state.sort = key; state.dir = -1; } renderTable(); } },
         label,
         state.sort === key ? el('span', { 'aria-hidden': 'true', text: state.dir < 0 ? ' \u25bc' : ' \u25b2' }) : null
       )
@@ -184,7 +229,7 @@
       return el('div', { class: 'panel' }, el('div', { class: 'empty' },
         el('h2', { text: 'No protocol matches that filter' }),
         el('p', { text: 'Clear the search or pick another category or chain to see the board again.' }),
-        el('button', { class: 'button primary', type: 'button', text: 'Clear filters', onclick: function () { state.q = ''; state.category = 'all'; state.chain = 'all'; writeHash(); render(); } })
+        el('button', { class: 'button primary', type: 'button', text: 'Clear filters', onclick: function () { state.q = ''; state.category = 'all'; state.chain = 'all'; state.watch = false; writeHash(); syncControls(); renderTable(); } })
       ));
     }
     // Bars are scaled to the board's top row, not to the first row of the
@@ -279,7 +324,7 @@
   }
 
   var dialog = el('dialog', { class: 'detail', id: 'detail', 'aria-labelledby': 'detail-title' });
-  dialog.addEventListener('close', function () { state.selected = null; writeHash(); });
+  dialog.addEventListener('close', function () { state.selected = null; writeHash(); renderTable(); });
 
   function openDetail(slug) {
     var row = DATA.rows.filter(function (r) { return r.slug === slug; })[0];
@@ -325,6 +370,21 @@
     } else {
       dialog.setAttribute('open', '');
     }
+    renderTable();
+  }
+
+  // Re-render only the table, the count line and the model panel's visibility;
+  // the controls stay put, so a search in progress keeps its text and focus.
+  function renderTable() {
+    if (!tableSlot) return;
+    tableSlot.textContent = '';
+    tableSlot.appendChild(state.tab === 'pre-token' ? boardTable() : liveTable());
+    if (modelSlot) modelSlot.style.display = state.tab === 'pre-token' ? '' : 'none';
+    if (state.tab === 'pre-token' && countEl) {
+      countEl.textContent = filteredRows().length + ' of ' + DATA.board_size + ' rows shown';
+    } else if (countEl) {
+      countEl.textContent = DATA.live.length + ' live-token protocols';
+    }
   }
 
   function render() {
@@ -334,12 +394,16 @@
     shell.appendChild(lede());
     shell.appendChild(stats());
     shell.appendChild(controls());
-    shell.appendChild(state.tab === 'pre-token' ? boardTable() : liveTable());
-    if (state.tab === 'pre-token') shell.appendChild(modelPanel());
+    tableSlot = el('div');
+    shell.appendChild(tableSlot);
+    modelSlot = el('div');
+    modelSlot.appendChild(modelPanel());
+    shell.appendChild(modelSlot);
     shell.appendChild(footer());
     app.appendChild(shell);
     app.setAttribute('aria-busy', 'false');
     if (!dialog.isConnected) app.appendChild(dialog);
+    renderTable();
     if (state.selected) openDetail(state.selected);
   }
 
