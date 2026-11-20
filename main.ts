@@ -38,21 +38,23 @@ function arg(name: string, fallback: string): string {
   return withEquals === undefined ? fallback : withEquals.slice(name.length + 3);
 }
 
+/** Stop with a message on stderr and a non-zero exit. */
+function fail(message: string): never {
+  process.stderr.write(`token radar: ${message}\n`);
+  process.exit(1);
+}
+
 const inputArg = arg('input', '/input');
 const inputFile = inputArg.endsWith('.json') ? inputArg : join(inputArg, 'snapshot.json');
 if (!existsSync(inputFile)) {
-  process.stderr.write(`token radar: no snapshot at ${inputFile}: pass --input <snapshot.json|directory> or mount the sealed /input\n`);
-  process.exit(2);
+  fail(`no snapshot at ${inputFile}: pass --input <snapshot.json|directory> or mount the sealed /input`);
 }
 const out = arg('output', process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
 
 const snapshot = parseSnapshot(readFileSync(inputFile, 'utf8'));
 const { board, radar } = buildRadar(snapshot);
 const issue = boardIssue(board, snapshot);
-if (issue !== null) {
-  process.stderr.write(`token radar: the model wrote a board the gate refuses: ${issue}\n`);
-  process.exit(1);
-}
+if (issue !== null) fail(`the model wrote a board the gate refuses: ${issue}`);
 
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'board.json'), `${JSON.stringify({ rows: board })}\n`);
@@ -75,21 +77,19 @@ function copyFiles(from: string, to: string): string[] {
 
 const dashFiles = copyFiles(join(here, 'dashboard'), join(out, 'dashboard'));
 const shots = copyFiles(join(here, 'screenshots'), join(out, 'screenshots'));
-if (shots.length < 3) {
-  // The board and the page are already written, so the dashboard can be screenshotted
-  // from this output; the dossier needs the screenshots, so the run stops here until
-  // they exist.
-  process.stderr.write(
-    `token radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')} and ${join(out, 'dashboard')} (${dashFiles.length} files), ` +
-      `but screenshots/ holds ${shots.length} image${shots.length === 1 ? '' : 's'}: hand in 3, the board, a detail view and a filtered view\n`,
-  );
-  process.exit(1);
-}
 for (const name of shots) {
   if (!IMAGE_NAME.test(name)) {
-    process.stderr.write(`token radar: screenshots/${name}: a name is letters, digits and . _ -, 1 to 128 characters\n`);
-    process.exit(1);
+    fail(`screenshots/${name}: a name is letters, digits and . _ -, 1 to 128 characters`);
   }
+}
+if (shots.length < 3) {
+  // The board and the page are already written, so the dashboard can be
+  // screenshotted from this output; the dossier needs the screenshots, so the
+  // run stops here until they exist.
+  fail(
+    `wrote ${join(out, 'board.json')}, ${join(out, 'data.js')} and ${join(out, 'dashboard')} (${dashFiles.length} files), ` +
+      `but screenshots/ holds ${shots.length} image${shots.length === 1 ? '' : 's'}: hand in 3, the board, a detail view and a filtered view`,
+  );
 }
 
 // The dossier is written last: the scorer rebuilds it from this /output and compares bytes.
