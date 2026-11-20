@@ -415,6 +415,62 @@ const CATEGORY_ACTIONS: CategoryActions[] = [
     second: (n, s) => `Add a second deposit of $${s} after the first funding round settles.`,
     repeat: (n, s) => `Each week, add a small deposit to ${n}'s basis vault after the funding round settles, so the wallet shows steady vault activity.`,
   },
+  {
+    match: ['liquidity'],
+    core: (n, c, ch) => `Deposit $${c} of USDC into a ${n} managed liquidity vault on ${ch} and let it place the range.`,
+    second: (n, s) => `Move $${s} into a second managed pool, so the wallet touches more than one range.`,
+    repeat: (n, s) => `Each week, top up the managed position a little or move a small amount between pools, so the wallet shows steady liquidity activity.`,
+  },
+  {
+    match: ['farm'],
+    core: (n, c, ch) => `Stake $${c} of LP tokens in ${n}'s farm on ${ch} and keep the stake locked.`,
+    second: (n, s) => `Harvest the first farm rewards and restake them, so the wallet shows a claim as well as a stake.`,
+    repeat: (n, s) => `Each week, harvest the farm rewards and restake them, so the wallet shows steady farming activity.`,
+  },
+  {
+    match: ['btc'],
+    core: (n, c, ch) => `Deposit $${c} of BTC into ${n} on ${ch} and hold the yield-bearing BTC asset it mints.`,
+    second: (n, s) => `Claim the BTC yield the position earns and record the claim in the farm log.`,
+    repeat: (n, s) => `Each week, claim or compound the BTC yield the position earns, so the wallet shows steady yield activity.`,
+  },
+  {
+    match: ['card'],
+    core: (n, c, ch) => `Top up ${n}'s card with $${c} on ${ch} and spend it on one everyday purchase.`,
+    second: (n, s) => `Make a second purchase of about $${s} with the card a few days later.`,
+    repeat: (n, s) => `Each week, spend a small amount through ${n}'s card, so the wallet shows steady payment activity.`,
+  },
+  {
+    match: ['payments'],
+    core: (n, c, ch) => `Send $${c} through ${n} on ${ch} for one real payment, and keep the receipt.`,
+    second: (n, s) => `Send a second payment of about $${s} through ${n} a few days later, to a different recipient.`,
+    repeat: (n, s) => `Each week, send one small payment through ${n}, so the wallet shows steady payment activity.`,
+  },
+  {
+    match: ['otc'],
+    core: (n, c, ch) => `Place a $${c} OTC quote on ${n} on ${ch} and let it settle.`,
+    second: (n, s) => `Settle the first quote and place a second quote of about $${s} on the other side.`,
+    repeat: (n, s) => `Each week, place one small OTC quote on ${n} and let it settle, so the wallet shows steady trading activity.`,
+  },
+  {
+    match: ['governance'],
+    core: (n, c, ch) => `Stake $${c} in ${n}'s governance vault on ${ch} and vote on one live proposal.`,
+    second: (n, s) => `Vote on a second proposal a few days later, so the wallet shows repeat governance activity.`,
+    repeat: (n, s) => `Each week, vote on one live proposal through ${n}, so the wallet shows steady governance activity.`,
+  },
+  {
+    match: ['cedefi'],
+    core: (n, c, ch) => `Deposit $${c} of USDC into ${n}'s CeDeFi vault on ${ch} and keep the vault shares.`,
+    second: (n, s) => `Add a second tranche of $${s} to a different ${n} vault, so the wallet touches more than one vault.`,
+    repeat: (n, s) => `Each week, add a small tranche to a ${n} vault or move a little between vaults, so the wallet shows steady vault activity.`,
+  },
+  {
+    // Last: 'chain' also appears inside 'Cross Chain Bridge', which the bridge
+    // row above already claims, so this only catches chains themselves.
+    match: ['chain'],
+    core: (n, c, ch) => `Bridge $${c} of USDC onto ${ch} through ${n}'s official bridge and use its flagship app.`,
+    second: (n, s, ch) => `Use a second native app on ${ch} with about $${s}, so the wallet shows activity across the chain.`,
+    repeat: (n, s, ch) => `Each week, make one transaction in a native app on ${ch}, so the wallet shows steady on-chain activity.`,
+  },
 ];
 
 /** The category's actions, or the generic deposit pair when nothing matches. */
