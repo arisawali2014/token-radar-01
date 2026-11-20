@@ -158,8 +158,8 @@
       chains.map(function (c) { return el('option', { value: c, text: c, selected: c === state.chain ? 'selected' : null }); })
     );
     chain.addEventListener('change', function () { state.chain = chain.value; writeHash(); render(); });
-    var pre = el('button', { type: 'button', 'aria-pressed': state.tab === 'pre-token' ? 'true' : 'false', text: 'Pre-token', onclick: function () { state.tab = 'pre-token'; render(); } });
-    var live = el('button', { type: 'button', 'aria-pressed': state.tab === 'live' ? 'true' : 'false', text: 'Live token', onclick: function () { state.tab = 'live'; render(); } });
+    var pre = el('button', { type: 'button', 'aria-pressed': state.tab === 'pre-token' ? 'true' : 'false', text: 'Pre-token', onclick: function () { state.tab = 'pre-token'; writeHash(); render(); } });
+    var live = el('button', { type: 'button', 'aria-pressed': state.tab === 'live' ? 'true' : 'false', text: 'Live token', onclick: function () { state.tab = 'live'; writeHash(); render(); } });
     return el('div', { class: 'controls' },
       el('div', { class: 'field' }, el('label', { for: 'q', text: 'Search' }), search),
       el('div', { class: 'field' }, el('label', { for: 'category', text: 'Category' }), cat),
@@ -187,7 +187,10 @@
         el('button', { class: 'button primary', type: 'button', text: 'Clear filters', onclick: function () { state.q = ''; state.category = 'all'; state.chain = 'all'; writeHash(); render(); } })
       ));
     }
-    var max = list[0].implied_value_usd || 1;
+    // Bars are scaled to the board's top row, not to the first row of the
+    // current sort or filter, so a mid-rank row never looks full-width
+    // just because the rows above it were filtered out.
+    var max = (DATA.rows[0] && DATA.rows[0].implied_value_usd) || 1;
     var tbody = el('tbody');
     list.forEach(function (r) {
       var growthClass = r.change_7d == null ? '' : r.change_7d >= 0 ? 'pos' : 'neg';
@@ -235,11 +238,12 @@
   function liveTable() {
     var tbody = el('tbody');
     DATA.live.forEach(function (r) {
+      var growthClass = r.change_7d == null ? '' : r.change_7d >= 0 ? 'pos' : 'neg';
       tbody.appendChild(el('tr', null,
         el('td', { class: 'num rank-num', text: 'live' }),
         el('td', null, el('div', { class: 'name' }, el('b', { text: r.name }), el('span', { class: 'sub', text: (r.category || 'Other') + ' \u00b7 ' + ((r.chains || []).slice(0, 2).join(', ') || 'an unnamed chain') }))),
         el('td', { class: 'num', text: fmtUsd(r.tvl_usd) }),
-        el('td', { class: 'num ' + (r.change_7d != null && r.change_7d >= 0 ? 'pos' : 'neg'), text: fmtPct(r.change_7d) }),
+        el('td', { class: 'num ' + growthClass, text: fmtPct(r.change_7d) }),
         el('td', { class: 'num', text: fmtUsd(r.mcap_usd) }),
         el('td', null, el('span', { class: 'badge', text: 'already trades' }))
       ));

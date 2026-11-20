@@ -390,7 +390,7 @@ export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
     },
     {
       text: `Repeat one qualifying action each week, a deposit, a borrow, a swap or a vote, so the wallet stays active across snapshots instead of going quiet.`,
-      cost: `about ${gas} a week`,
+      cost: `${gas} a week`,
       time: '10 minutes a week',
     },
     {
