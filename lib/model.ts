@@ -336,7 +336,8 @@ function gasFor(chain: string): string {
 
 /**
  * One category's pair of qualifying actions. `core` is the main deposit, `second`
- * a different touchpoint so the wallet shows more than one kind of activity.
+ * a different touchpoint so the wallet shows more than one kind of activity, and
+ * `repeat` is the weekly cadence that keeps the wallet active across snapshots.
  * The table is matched on the category's lowercase words; the fallback row at
  * the end covers every category the table does not name.
  */
@@ -344,6 +345,7 @@ interface CategoryActions {
   match: string[];
   core: (name: string, capital: number, chain: string) => string;
   second: (name: string, small: number, chain: string) => string;
+  repeat: (name: string, small: number, chain: string) => string;
 }
 
 const CATEGORY_ACTIONS: CategoryActions[] = [
@@ -351,56 +353,67 @@ const CATEGORY_ACTIONS: CategoryActions[] = [
     match: ['lend', 'cdp', 'collateral'],
     core: (n, c, ch) => `Supply $${c} of USDC to ${n} on ${ch} and keep the position open.`,
     second: (n, s) => `Borrow $${s} against the supply and repay it inside the same week, so the loan leaves a trace without interest piling up.`,
+    repeat: () => `Each week, top up the supply a little or run one borrow-and-repay cycle, so the wallet shows steady lending activity.`,
   },
   {
     match: ['dex', 'yield', 'leveraged farm'],
     core: (n, c, ch) => `Provide $${c} of liquidity to ${n}'s main pool on ${ch} and keep the position open.`,
     second: (n, s) => `Swap $${s} through ${n}'s own pool, so the wallet shows trading volume as well as liquidity.`,
+    repeat: (n, s) => `Each week, swap a small amount through ${n}'s pool or add a little more liquidity, so the wallet shows steady trading and LP activity.`,
   },
   {
     match: ['bridge'],
     core: (n, c, ch) => `Bridge $${c} of USDC to ${ch} through ${n} and use the bridged funds in its app.`,
     second: (n, s) => `Bridge $${s} back the other way a week later, so the wallet has volume in both directions.`,
+    repeat: (n, s) => `Each week, bridge a small amount through ${n} in one direction, alternating the direction, so the wallet shows steady bridging volume.`,
   },
   {
     match: ['staking', 'restak'],
     core: (n, c) => `Stake $${c} of the chain's staking asset through ${n} and keep the receipt token.`,
     second: (n, s) => `Stake a second, smaller amount of $${s} a week later, so the wallet shows repeat staking rather than one deposit.`,
+    repeat: (n, s) => `Each week, stake a small extra amount through ${n} or claim and restake the rewards, so the wallet shows steady staking activity.`,
   },
   {
     match: ['perpetual', 'derivative'],
     core: (n, c, ch) => `Deposit $${c} of USDC as margin on ${n} and open one small hedge, no more than a tenth of the deposit.`,
     second: (n, s) => `Close the first hedge after a few days and open a fresh one the next week, keeping each trade small.`,
+    repeat: (n, s) => `Each week, open and close one small hedge on ${n}, keeping each trade a fraction of the deposit, so the wallet shows steady trading.`,
   },
   {
     match: ['prediction'],
     core: (n, c) => `Fund $${c} and place one market position on ${n}, on an outcome you have read about first.`,
     second: (n, s) => `Settle the first market and place a second $${s} position on a different outcome.`,
+    repeat: (n, s) => `Each week, settle one market on ${n} and place one small position on a new outcome, so the wallet shows steady market activity.`,
   },
   {
     match: ['curator', 'allocator'],
     core: (n, c, ch) => `Deposit $${c} into a ${n} vault on ${ch} and keep the vault shares.`,
     second: (n, s) => `Deposit a second tranche of $${s} into a different ${n} vault, so the wallet touches more than one vault.`,
+    repeat: (n, s) => `Each week, add a small tranche to a ${n} vault or move a little between vaults, so the wallet shows steady vault activity.`,
   },
   {
     match: ['stable'],
     core: (n, c, ch) => `Mint or deposit $${c} of the stable asset through ${n} on ${ch} and hold it.`,
     second: (n, s) => `Swap half of the minted stable asset for USDC and back, so the wallet shows use of the stable asset.`,
+    repeat: (n, s) => `Each week, mint a small amount of the stable asset through ${n} or swap a little of it, so the wallet shows steady use of the stable asset.`,
   },
   {
     match: ['rwa'],
     core: (n, c, ch) => `Mint $${c} of the protocol's yield-bearing asset on ${ch} and hold it.`,
     second: () => `Claim or compound the yield the position earns, and record the claim in the farm log.`,
+    repeat: () => `Each week, claim or compound the yield the position earns, so the wallet shows steady yield activity.`,
   },
   {
     match: ['insurance'],
     core: (n, c, ch) => `Buy $${c} of cover from ${n} on ${ch} and keep the policy active.`,
     second: (n, s) => `Top up the cover by $${s} or renew it before it lapses, so the policy stays continuous.`,
+    repeat: () => `Each week, check the cover stays active and top it up before it lapses, so the policy never goes quiet.`,
   },
   {
     match: ['basis'],
     core: (n, c, ch) => `Deposit $${c} of USDC into ${n}'s basis vault on ${ch} and keep the position open.`,
     second: (n, s) => `Add a second deposit of $${s} after the first funding round settles.`,
+    repeat: (n, s) => `Each week, add a small deposit to ${n}'s basis vault after the funding round settles, so the wallet shows steady vault activity.`,
   },
 ];
 
@@ -414,6 +427,7 @@ function actionsFor(p: SnapshotProtocol): CategoryActions {
     match: [],
     core: (n, cap, ch) => `Deposit $${cap} of USDC into ${n} on ${ch} and keep the position open.`,
     second: (n, s) => `Make a second deposit of $${s} a week later, so the wallet shows repeat activity instead of one deposit.`,
+    repeat: () => `Each week, repeat one qualifying action, a deposit, a borrow, a swap or a vote, so the wallet stays active across snapshots instead of going quiet.`,
   };
 }
 
@@ -446,7 +460,7 @@ export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
       time: '10 minutes',
     },
     {
-      text: `Repeat one qualifying action each week, a deposit, a borrow, a swap or a vote, so the wallet stays active across snapshots instead of going quiet.`,
+      text: actions.repeat(p.name, small, chain),
       cost: `${gas} a week`,
       time: '10 minutes a week',
     },
