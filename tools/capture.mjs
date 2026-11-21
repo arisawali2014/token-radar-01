@@ -1,16 +1,16 @@
 // Capture the three dossier screenshots with the headless browser on this machine.
 //
-// The dashboard mirrors its state in the URL hash, so each view is one file URL:
-// the board, a protocol's detail drawer, and a filtered view. Chrome's --screenshot
-// switch does not produce a file in this build (it exits silently), so this script
-// drives the same binary over its DevTools protocol instead: it launches Chrome
-// headless with a remote-debugging port, opens each URL in its own target, waits
-// for the page to load and settle, and saves Page.captureScreenshot PNGs.
-// tools/jpg.py then tunes each one to a JPEG in the 300-350 KB band.
+// The dashboard mirrors its state in the URL hash, so each view is one file URL: the board, a
+// protocol's detail drawer, and a filtered view. This Chromium build's --screenshot switch exits
+// without writing a file, so the script drives the same binary over its DevTools protocol instead:
+// launch headless with a remote-debugging port, open each URL in its own target, wait for the page
+// to load and settle, and save Page.captureScreenshot PNGs. tools/jpg.py then tunes each one to a
+// JPEG in the 300-350 KB band.
 //
 // Usage: node tools/capture.mjs [detail-slug] [filter-category]
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,13 +22,13 @@ const outDir = join(repo, 'out', 'dashboard');
 const tmpDir = join(repo, '.shots');
 mkdirSync(tmpDir, { recursive: true });
 
-const top = process.argv[2] ?? 'steakhouse-financial';
-const filter = process.argv[3] ?? 'Lending';
+const detailSlug = process.argv[2] ?? 'steakhouse-financial';
+const filterCategory = process.argv[3] ?? 'Lending';
 
 const shots = [
   ['1-board.png', `${outDir}/index.html`],
-  ['2-detail.png', `${outDir}/index.html#p=${top}`],
-  ['3-filtered.png', `${outDir}/index.html#category=${filter}`],
+  ['2-detail.png', `${outDir}/index.html#p=${detailSlug}`],
+  ['3-filtered.png', `${outDir}/index.html#category=${encodeURIComponent(filterCategory)}`],
 ];
 
 const PORT = 9333;
@@ -37,13 +37,6 @@ const HEIGHT = 900;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** The SHA-256 of the WebGL domain policy this Chromium build requires at startup. */
-async function policySha256() {
-  const { createHash } = await import('node:crypto');
-  const { readFileSync } = await import('node:fs');
-  return createHash('sha256').update(readFileSync(policyPath)).digest('hex');
-}
-
 /** Wait until Chrome's DevTools HTTP endpoint answers. */
 async function waitForChrome() {
   const deadline = Date.now() + 30_000;
@@ -51,7 +44,9 @@ async function waitForChrome() {
     try {
       const res = await fetch(`http://127.0.0.1:${PORT}/json/version`);
       if (res.ok) return;
-    } catch { /* not up yet */ }
+    } catch {
+      /* not up yet */
+    }
     if (Date.now() > deadline) throw new Error('chrome did not open its DevTools port in 30s');
     await sleep(250);
   }
@@ -71,7 +66,11 @@ function cdp(ws, id, method, params = {}) {
   return new Promise((resolve, reject) => {
     const onMessage = (event) => {
       let msg;
-      try { msg = JSON.parse(event.data); } catch { return; }
+      try {
+        msg = JSON.parse(event.data);
+      } catch {
+        return;
+      }
       if (msg.id !== id) return;
       ws.removeEventListener('message', onMessage);
       if (msg.error) reject(new Error(`${method}: ${msg.error.message}`));
@@ -101,7 +100,9 @@ async function shoot(wsUrl, url, dest) {
   console.log(`capture: ${dest.split('/').pop()} <- ${url}`);
 }
 
-const sha = await policySha256();
+/** The SHA-256 of the WebGL domain policy this Chromium build requires at startup. */
+const policySha = createHash('sha256').update(readFileSync(policyPath)).digest('hex');
+
 const child = spawn(
   chrome,
   [
@@ -114,7 +115,7 @@ const child = spawn(
     `--remote-debugging-port=${PORT}`,
     `--user-data-dir=${join(tmpDir, 'chrome-profile')}`,
     `--hatch-webgl-allowed-domains-file=${policyPath}`,
-    `--hatch-webgl-allowed-domains-sha256=${sha}`,
+    `--hatch-webgl-allowed-domains-sha256=${policySha}`,
     'about:blank',
   ],
   { stdio: 'ignore' },

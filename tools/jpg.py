@@ -4,7 +4,7 @@
 The gate caps each screenshot at 512 KiB with a long side at most 1440 px and a
 short side at least 800 px; the dossier wants three near the cap without passing
 it, so each image is saved as JPEG at the highest quality that still lands in
-the band (quality 70-95, stepping down by 5)."""
+the band (quality 95 down to 60, stepping by 5)."""
 import os
 import sys
 from PIL import Image
@@ -30,12 +30,11 @@ for name in names:
     for q in (95, 90, 85, 80, 75, 70, 65, 60):
         img.save(dest, "JPEG", quality=q, optimize=True)
         size = os.path.getsize(dest)
-        if LO <= size <= HI or (size < LO and q == 60):
+        if LO <= size <= HI:
             picked = (q, size)
             break
         if size < LO:
-            # A lower quality only shrinks it further; keep this one if it is
-            # the closest above the floor, else fall through to the smallest.
+            # A lower quality only shrinks it further; keep the closest above the floor.
             picked = (q, size)
             break
         # size > HI: try a lower quality.

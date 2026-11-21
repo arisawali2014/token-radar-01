@@ -1,17 +1,15 @@
 // A token-radar-01 entry (Node 22, standard library only).
 //
-// The program reads the sealed snapshot from /input/snapshot.json (or --input <file|dir>),
-// scores the pre-token protocols with the radar-2 model in lib/model.ts, writes the
-// ranked board to /output/board.json, writes the dashboard's data beside the page as
-// data.js, copies this repository's dashboard/ and screenshots/ to /output, and writes
-// /output/dossier.json with the vendored make.fun library, so the sealed scorer can
-// rebuild it byte for byte.
+// The program reads the sealed snapshot from /input/snapshot.json (or --input <file|dir>), scores the
+// pre-token protocols with the radar-3 model in lib/model.ts, writes the ranked board to
+// /output/board.json, writes the dashboard's data beside the page as data.js, copies this repository's
+// dashboard/ and screenshots/ to /output, and writes /output/dossier.json with the vendored make.fun
+// library, so the sealed scorer can rebuild it byte for byte.
 //
-// The dashboard is a static page, no framework and no network: dashboard/index.html,
-// dashboard/app.css and dashboard/app.js read the data.js written beside them. The page
-// renders the ranked board, a searchable and filterable table, a per-protocol detail
-// view with the model's own inputs and the protocol's farm plan, and the live-token
-// protocols set aside at their market caps.
+// The dashboard is a static page, no framework and no network: dashboard/index.html, dashboard/app.css
+// and dashboard/app.js read the data.js written beside them. The page renders the ranked board, a
+// searchable and filterable table, a per-protocol detail view with the model's own inputs and the
+// protocol's farm plan, and the live-token protocols set aside at their market caps.
 //
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input ./input/snapshot.json
